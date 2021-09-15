@@ -121,14 +121,9 @@ export const useReferenceArrayInputController = (
     const form = useForm();
     const onSelect = useCallback(
         (newIds: Identifier[]) => {
-            const newValue = new Set(input.value);
-            newIds.forEach(newId => {
-                newValue.add(newId);
-            });
-
-            form.change(input.name, Array.from(newValue));
+            form.change(input.name, newIds);
         },
-        [form, input.name, input.value]
+        [form, input.name]
     );
 
     const onUnselectItems = useCallback(() => {
@@ -316,7 +311,7 @@ export const useReferenceArrayInputController = (
         perPage,
         refetch,
         resource,
-        selectedIds: input.value,
+        selectedIds: input.value || [],
         setFilter,
         setFilters,
         setPage,
