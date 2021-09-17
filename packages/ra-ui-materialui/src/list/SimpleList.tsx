@@ -1,5 +1,11 @@
 import * as React from 'react';
-import { isValidElement, ReactNode, ReactElement } from 'react';
+import {
+    isValidElement,
+    ReactNode,
+    ReactElement,
+    useEffect,
+    useState,
+} from 'react';
 import PropTypes from 'prop-types';
 import {
     Avatar,
@@ -14,13 +20,14 @@ import {
 import { makeStyles } from '@material-ui/core/styles';
 import { Link } from 'react-router-dom';
 import {
+    Identifier,
     linkToRecord,
+    Record,
+    RecordContextProvider,
+    RecordMap,
     sanitizeListRestProps,
     useListContext,
-    Record,
-    RecordMap,
-    Identifier,
-    RecordContextProvider,
+    useResourceContext,
 } from 'ra-core';
 
 import SimpleListLoading from './SimpleListLoading';
@@ -88,6 +95,7 @@ const SimpleList = <RecordType extends Record = Record>(
     const { basePath, data, ids, loaded, total } = useListContext<RecordType>(
         props
     );
+    const resource = useResourceContext(props);
     const classes = useStyles(props);
 
     if (loaded === false) {
@@ -129,6 +137,7 @@ const SimpleList = <RecordType extends Record = Record>(
                                 basePath={basePath}
                                 id={id}
                                 record={data[id]}
+                                resource={resource}
                             >
                                 <ListItem
                                     button={!!linkType as any}
@@ -271,20 +280,32 @@ const LinkOrNot = (props: LinkOrNotProps) => {
         id,
         children,
         record,
+        resource,
     } = props;
     const classes = useLinkOrNotStyles({ classes: classesOverride });
-    const link =
-        typeof linkType === 'function' ? linkType(record, id) : linkType;
+    const [effect, setEffect] = useState<string>(() =>
+        linkType === 'edit' || linkType === true
+            ? linkToRecord(basePath || `/${resource}`, id)
+            : linkToRecord(basePath || `/${resource}`, id, 'show')
+    );
 
-    return link === 'edit' || link === true ? (
-        <Link to={linkToRecord(basePath, id)} className={classes.link}>
-            {children}
-        </Link>
-    ) : link === 'show' ? (
-        <Link
-            to={`${linkToRecord(basePath, id)}/show`}
-            className={classes.link}
-        >
+    useEffect(() => {
+        if (typeof linkType !== 'function') {
+            return;
+        }
+        const getEffect = async () => {
+            if (typeof linkType === 'function') {
+                setEffect(
+                    await linkType(record, id, basePath || `/${resource}`)
+                );
+            }
+        };
+
+        getEffect();
+    }, [basePath, id, linkType, record, resource]);
+
+    return typeof effect === 'string' ? (
+        <Link to={effect} className={classes.link}>
             {children}
         </Link>
     ) : (
@@ -292,7 +313,11 @@ const LinkOrNot = (props: LinkOrNotProps) => {
     );
 };
 
-export type FunctionLinkType = (record: Record, id: Identifier) => string;
+export type FunctionLinkType = (
+    record: Record,
+    id: Identifier,
+    basePath?: string
+) => string | Promise<string>;
 
 export interface LinkOrNotProps {
     classes?: ClassesOverride<typeof useLinkOrNotStyles>;
@@ -300,6 +325,7 @@ export interface LinkOrNotProps {
     basePath: string;
     id: Identifier;
     record: Record;
+    resource?: string;
     children: ReactNode;
 }
 

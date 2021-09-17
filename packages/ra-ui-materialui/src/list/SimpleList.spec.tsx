@@ -49,4 +49,44 @@ describe('<SimpleList />', () => {
             ).not.toBeNull();
         });
     });
+
+    it.each([
+        ['edit', '/posts/1', 'edit'],
+        ['boolean', '/posts/1', true],
+        ['show', '/posts/1/show', 'show'],
+        [
+            'function',
+            '/posts/1/details',
+            (record, id, basePath) => `${basePath}/${id}/details`,
+        ],
+    ])('should support %s linkType', async (_, expectedUrl, linkType) => {
+        const { getByText } = renderWithRouter(
+            <ListContext.Provider
+                value={{
+                    loaded: true,
+                    loading: false,
+                    ids: [1, 2],
+                    data: {
+                        1: { id: 1, title: 'foo' },
+                        2: { id: 2, title: 'bar' },
+                    },
+                    total: 2,
+                    resource: 'posts',
+                    basePath: '/posts',
+                }}
+            >
+                <SimpleList
+                    linkType={linkType}
+                    primaryText={record => record.id.toString()}
+                    secondaryText={<TextField source="title" />}
+                />
+            </ListContext.Provider>
+        );
+
+        await waitFor(() => {
+            expect(getByText('1').closest('a').getAttribute('href')).toEqual(
+                expectedUrl
+            );
+        });
+    });
 });
