@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, waitFor, within } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { Router } from 'react-router-dom';
 import { ListContext } from 'ra-core';
@@ -8,7 +8,7 @@ import SimpleList from './SimpleList';
 import TextField from '../field/TextField';
 
 const renderWithRouter = children => {
-    const history = createMemoryHistory();
+    const history = createMemoryHistory({ initialEntries: ['/posts'] });
 
     return {
         history,
@@ -60,7 +60,7 @@ describe('<SimpleList />', () => {
             (record, id, basePath) => `${basePath}/${id}/details`,
         ],
     ])('should support %s linkType', async (_, expectedUrl, linkType) => {
-        const { getByText } = renderWithRouter(
+        const { history, getByText } = renderWithRouter(
             <ListContext.Provider
                 value={{
                     loaded: true,
@@ -83,10 +83,39 @@ describe('<SimpleList />', () => {
             </ListContext.Provider>
         );
 
+        fireEvent.click(getByText('1'));
         await waitFor(() => {
-            expect(getByText('1').closest('a').getAttribute('href')).toEqual(
+            expect(history.entries[history.length - 1].pathname).toEqual(
                 expectedUrl
             );
+        });
+    });
+    it('should not render a link if linkType is false', async () => {
+        const { getByText } = renderWithRouter(
+            <ListContext.Provider
+                value={{
+                    loaded: true,
+                    loading: false,
+                    ids: [1, 2],
+                    data: {
+                        1: { id: 1, title: 'foo' },
+                        2: { id: 2, title: 'bar' },
+                    },
+                    total: 2,
+                    resource: 'posts',
+                    basePath: '/posts',
+                }}
+            >
+                <SimpleList
+                    linkType={false}
+                    primaryText={record => record.id.toString()}
+                    secondaryText={<TextField source="title" />}
+                />
+            </ListContext.Provider>
+        );
+
+        await waitFor(() => {
+            expect(getByText('1').closest('a')).toBeNull();
         });
     });
 });

@@ -1,11 +1,5 @@
 import * as React from 'react';
-import {
-    isValidElement,
-    ReactNode,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import { isValidElement, ReactNode, ReactElement, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
     Avatar,
@@ -18,7 +12,7 @@ import {
     ListItemText,
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import { Link } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import {
     Identifier,
     linkToRecord,
@@ -140,7 +134,7 @@ const SimpleList = <RecordType extends Record = Record>(
                                 resource={resource}
                             >
                                 <ListItem
-                                    button={!!linkType as any}
+                                    component="div"
                                     style={
                                         rowStyle
                                             ? rowStyle(data[id], rowIndex)
@@ -283,38 +277,46 @@ const LinkOrNot = (props: LinkOrNotProps) => {
         resource,
     } = props;
     const classes = useLinkOrNotStyles({ classes: classesOverride });
-    const [effect, setEffect] = useState<string>(() =>
-        linkType === 'edit' || linkType === true
-            ? linkToRecord(basePath || `/${resource}`, id)
-            : linkToRecord(basePath || `/${resource}`, id, 'show')
+    const history = useHistory();
+
+    const handleClick = useCallback(
+        async event => {
+            if (!linkType) return;
+            event.persist();
+
+            const effect =
+                typeof linkType === 'function'
+                    ? await linkType(record, id, basePath || `/${resource}`)
+                    : linkType;
+            switch (effect) {
+                case true:
+                case 'edit':
+                    history.push(linkToRecord(basePath || `/${resource}`, id));
+                    return;
+                case 'show':
+                    history.push(
+                        linkToRecord(basePath || `/${resource}`, id, 'show')
+                    );
+                    return;
+                default:
+                    if (effect) history.push(effect);
+                    return;
+            }
+        },
+        [basePath, history, id, record, resource, linkType]
     );
 
-    useEffect(() => {
-        if (typeof linkType !== 'function') {
-            return;
-        }
-        const getEffect = async () => {
-            if (typeof linkType === 'function') {
-                setEffect(
-                    await linkType(record, id, basePath || `/${resource}`)
-                );
-            }
-        };
-
-        getEffect();
-    }, [basePath, id, linkType, record, resource]);
-
-    return typeof effect === 'string' ? (
-        <Link to={effect} className={classes.link}>
+    return linkType !== false ? (
+        <button onClick={handleClick} className={classes.link}>
             {children}
-        </Link>
+        </button>
     ) : (
         <span>{children}</span>
     );
 };
 
 export type FunctionLinkType = (
-    record: Record,
+    recordOrId: Record,
     id: Identifier,
     basePath?: string
 ) => string | Promise<string>;
